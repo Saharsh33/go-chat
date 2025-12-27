@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -33,7 +32,7 @@ func (c *Client) readPump(h *Hub) {
 			continue
 		}
 		msg.User = c.Username
-		var roomOpsDetails *RoomOps = &RoomOps{clientDetails: c, roomDetails: msg.Room}
+		var roomOpsDetails RoomOps = RoomOps{clientDetails: c, roomDetails: msg.Room}
 
 		switch msg.Type {
 		case "join":
@@ -41,6 +40,7 @@ func (c *Client) readPump(h *Hub) {
 		case "leave":
 			h.LeaveRoom <- roomOpsDetails
 		case "create":
+			log.Printf("Sent for room creation!! %+v", roomOpsDetails)
 			h.CreateRoom <- roomOpsDetails
 		case "messageRoom":
 			h.Broadcast <- msg
