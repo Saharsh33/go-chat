@@ -1,7 +1,13 @@
 package websocket
 
+import "log"
+
 type Hub struct {
 	Clients    map[*Client]bool
+	Rooms      map[Room]map[*Client]bool
+	JoinRoom   chan *RoomOps
+	LeaveRoom  chan *RoomOps
+	CreateRoom chan *RoomOps
 	Register   chan *Client
 	Unregister chan *Client
 	Broadcast  chan Message
@@ -32,15 +38,49 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.Broadcast: //broadcast msg is sent
-
-			for client := range h.Clients { //for all clients
-				select {
-				case client.Send <- message:
-				default:
-					close(client.Send) //if client is slow or dead
-					delete(h.Clients, client)
+			switch message.Type {
+			case "broadcast":
+				for client := range h.Clients { //for all clients
+					select {
+					case client.Send <- message:
+					default:
+						close(client.Send) //if client is slow or dead
+						delete(h.Clients, client)
+					}
 				}
+			case "messageRoom":
+				for client := range h.Rooms[Room{name: message.Room}] { //for all clients
+					select {
+					case client.Send <- message:
+					default:
+						close(client.Send) //if client is slow or dead
+						delete(h.Clients, client)
+					}
+				}
+
+			}
+		case JoinRoomDetails := <-h.JoinRoom:
+			var tempRoom Room = Room{name: JoinRoomDetails.roomDetails}
+			_, ok := h.Rooms[tempRoom]
+			if ok {
+				h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
+			}
+		case LeaveRoomDetails := <-h.LeaveRoom:
+			var tempRoom Room = Room{name: LeaveRoomDetails.roomDetails}
+			_, ok := h.Rooms[tempRoom]
+			if ok {
+				h.Rooms[tempRoom][LeaveRoomDetails.clientDetails] = false
+			}
+
+		case CreateRoomDetails := <-h.CreateRoom:
+			var tempRoom Room = Room{name: CreateRoomDetails.roomDetails}
+			_, ok := h.Rooms[tempRoom]
+			if ok {
+				log.Println("Room already exists")
+			} else {
+				h.Rooms[tempRoom] = map[*Client]bool{}
 			}
 		}
+
 	}
 }

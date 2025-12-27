@@ -2,7 +2,9 @@ package websocket
 
 import (
 	"log"
+	"math/rand"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -23,11 +25,11 @@ func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-
 	//create client
 	client := &Client{
-		Conn: conn,
-		Send: make(chan Message),
+		Conn:     conn,
+		Username: "user-" + strconv.Itoa(rand.Intn(100000)),
+		Send:     make(chan Message),
 	}
 
 	//register client
