@@ -33,23 +33,6 @@ func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 	//register client
 	h.Register <- client
 
-	//goroutine
-	go func() {
-		defer func() {
-			h.Unregister <- client
-			conn.Close()
-		}()
-
-		//temporary
-		for {
-			msgType, msg, err := conn.ReadMessage()
-			//break the loop upon error
-			if err != nil {
-				log.Println(err)
-				break
-			}
-			log.Println(msgType, msg)
-		}
-	}()
-
+	go client.writePump()
+	go client.readPump(h)
 }
