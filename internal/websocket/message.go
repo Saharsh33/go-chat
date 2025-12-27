@@ -3,6 +3,6 @@ package websocket
 type Message struct {
 	Type    string `json:"type"`
 	User    string `json:"user"`
-	Channel string `json:"channel"`
+	Room    string `json:"room"`
 	Content string `json:"content"`
 }
