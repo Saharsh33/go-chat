@@ -27,7 +27,7 @@ func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 	//create client
 	client := &Client{
 		Conn: conn,
-		Send: make(chan []byte),
+		Send: make(chan Message),
 	}
 
 	//register client

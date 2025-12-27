@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/gorilla/websocket"
@@ -8,7 +9,7 @@ import (
 
 type Client struct {
 	Conn *websocket.Conn
-	Send chan []byte
+	Send chan Message
 }
 
 // readpump can detect disconnection error
@@ -19,10 +20,16 @@ func (c *Client) readPump(h *Hub) {
 	}()
 
 	for {
-		_, msg, err := c.Conn.ReadMessage()
+		_, raw, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
 			break
+		}
+
+		var msg Message
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			log.Println("invalid json:", err)
+			continue
 		}
 
 		h.Broadcast <- msg //send msg for broadcasting
@@ -34,7 +41,12 @@ func (c *Client) writePump() {
 	defer c.Conn.Close()
 
 	for message := range c.Send {
-		err := c.Conn.WriteMessage(websocket.TextMessage, message)
+		data, err := json.Marshal(message)
+		if err != nil {
+			log.Println("marshal error:", err)
+			continue
+		}
+		err = c.Conn.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
 			log.Println(err)
 			break
