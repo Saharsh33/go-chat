@@ -25,7 +25,8 @@ func (c *Client) readPump(h *Hub) {
 			break
 		}
 
-		_ = msg //for now we are doing nothing with the msg
+		h.Broadcast <- msg //send msg for broadcasting
+		// log.Println("Message sent for broadcasting:-", string(msg))
 	}
 }
 
@@ -38,5 +39,6 @@ func (c *Client) writePump() {
 			log.Println(err)
 			break
 		}
+		// log.Println("Message writen:-", string(message))
 	}
 }
