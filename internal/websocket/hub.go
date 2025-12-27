@@ -13,3 +13,21 @@ func NewHub() *Hub {
 		Unregister: make(chan *Client),
 	}
 }
+
+func (h *Hub) Run() {
+	for {
+		select {
+		case client := <-h.Register:
+
+			h.Clients[client] = true
+
+		case client := <-h.Unregister:
+
+			_, exists := h.Clients[client] //break to key,value pair
+			if exists {                    //if client exists then remove from map and close channel
+				delete(h.Clients, client)
+				close(client.Send)
+			}
+		}
+	}
+}
