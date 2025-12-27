@@ -34,10 +34,13 @@ func (h *Hub) Run() {
 			h.Clients[client] = true
 
 		case client := <-h.Unregister:
-
-			_, exists := h.Clients[client] //break to key,value pair
-			if exists {                    //if client exists then remove from map and close channel
+			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
+
+				for _, clients := range h.Rooms {
+					delete(clients, client)
+				}
+
 				close(client.Send)
 			}
 
@@ -50,17 +53,26 @@ func (h *Hub) Run() {
 					case client.Send <- message:
 					default:
 						close(client.Send) //if client is slow or dead
+						for _, clients := range h.Rooms {
+							delete(clients, client)
+						}
 						delete(h.Clients, client)
 					}
 				}
 			case "messageRoom":
-				for client := range h.Rooms[Room{name: message.Room}] { //for all clients
-					select {
-					case client.Send <- message:
-					default:
-						close(client.Send) //if client is slow or dead
-						delete(h.Clients, client)
+				var tempRoom Room = Room{name: message.Room}
+				_, ok := h.Rooms[tempRoom]
+				if ok {
+					for client := range h.Rooms[Room{name: message.Room}] { //for all clients in the room
+						select {
+						case client.Send <- message:
+						default:
+							close(client.Send) //if client is slow or dead
+							delete(h.Clients, client)
+						}
 					}
+				} else {
+					log.Println("Room doesn't exists or you are not in the room!! ", tempRoom)
 				}
 
 			}
@@ -77,7 +89,7 @@ func (h *Hub) Run() {
 			var tempRoom Room = Room{name: LeaveRoomDetails.roomDetails}
 			_, ok := h.Rooms[tempRoom]
 			if ok {
-				h.Rooms[tempRoom][LeaveRoomDetails.clientDetails] = false
+				delete(h.Rooms[tempRoom], LeaveRoomDetails.clientDetails)
 				log.Printf("Left %s succesfully\n", LeaveRoomDetails.roomDetails)
 			} else {
 				log.Printf("Couldn't leave %s\n", LeaveRoomDetails.roomDetails)
