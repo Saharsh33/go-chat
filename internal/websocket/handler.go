@@ -15,7 +15,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func serveWS(h *Hub, w http.ResponseWriter, r *http.Request) {
+func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 
 	//upgrading from http to websocket
 	conn, err := upgrader.Upgrade(w, r, nil)
