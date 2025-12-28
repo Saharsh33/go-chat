@@ -3,7 +3,7 @@ package websocket
 import "log"
 
 type Hub struct {
-	Clients    map[*Client]bool
+	Clients    map[string]*Client //string is username
 	Rooms      map[Room]map[*Client]bool
 	JoinRoom   chan RoomOps
 	LeaveRoom  chan RoomOps
@@ -15,7 +15,7 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		Clients:    make(map[*Client]bool),
+		Clients:    make(map[string]*Client),
 		Rooms:      make(map[Room]map[*Client]bool),
 		JoinRoom:   make(chan RoomOps),
 		LeaveRoom:  make(chan RoomOps),
@@ -31,11 +31,11 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.Register:
 
-			h.Clients[client] = true
+			h.Clients[client.Username] = client
 
 		case client := <-h.Unregister:
-			if _, ok := h.Clients[client]; ok {
-				delete(h.Clients, client)
+			if _, ok := h.Clients[client.Username]; ok {
+				delete(h.Clients, client.Username)
 
 				for _, clients := range h.Rooms {
 					delete(clients, client)
@@ -48,7 +48,7 @@ func (h *Hub) Run() {
 			switch message.Type {
 			case "broadcast":
 				message.Room = "From Broadcast Channel"
-				for client := range h.Clients { //for all clients
+				for _, client := range h.Clients { //for all clients
 					select {
 					case client.Send <- message:
 					default:
@@ -56,20 +56,26 @@ func (h *Hub) Run() {
 						for _, clients := range h.Rooms {
 							delete(clients, client)
 						}
-						delete(h.Clients, client)
+						delete(h.Clients, client.Username)
 					}
 				}
 			case "messageRoom":
 				var tempRoom Room = Room{name: message.Room}
-				_, ok := h.Rooms[tempRoom]
-				if ok {
-					for client := range h.Rooms[Room{name: message.Room}] { //for all clients in the room
-						select {
-						case client.Send <- message:
-						default:
-							close(client.Send) //if client is slow or dead
-							delete(h.Clients, client)
+				_, ok1 := h.Rooms[tempRoom]
+
+				if ok1 {
+					_, ok2 := h.Rooms[tempRoom][h.Clients[message.User]]
+					if ok2 {
+						for client := range h.Rooms[Room{name: message.Room}] { //for all clients in the room
+							select {
+							case client.Send <- message:
+							default:
+								close(client.Send) //if client is slow or dead
+								delete(h.Clients, client.Username)
+							}
 						}
+					} else {
+						log.Println(message.User, " is not in the room:-", tempRoom.name)
 					}
 				} else {
 					log.Println("Room doesn't exists or you are not in the room!! ", tempRoom)
@@ -104,6 +110,7 @@ func (h *Hub) Run() {
 				log.Println("Room already exists")
 			} else {
 				h.Rooms[tempRoom] = map[*Client]bool{}
+				h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
 				log.Println("Room created!! ", tempRoom)
 			}
 		}
