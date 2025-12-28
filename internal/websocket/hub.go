@@ -42,6 +42,7 @@ func (h *Hub) Run() {
 
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
+			client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
 
 		case client := <-h.Unregister:
 
@@ -52,6 +53,7 @@ func (h *Hub) Run() {
 				for _, clients := range h.Rooms {
 					delete(clients, client)
 				}
+				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Unregistered Successfully"}
 				// close send channel
 				close(client.Send)
 			}
@@ -80,6 +82,7 @@ func (h *Hub) Run() {
 						delete(h.Clients, client.Username)
 					}
 				}
+				h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Message sent to broadcast"}
 
 			case MsgRoomMessage:
 
@@ -107,11 +110,14 @@ func (h *Hub) Run() {
 								delete(h.Clients, client.Username)
 							}
 						}
+						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Message sent"}
 					} else {
+						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "User not part of room"}
 						log.Println(message.User, " is not in the room:-", tempRoom.name)
 					}
 				} else {
-					log.Println("Room doesn't exists or you are not in the room!! ", tempRoom)
+					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Room " + message.Room + " doesn't exist"}
+					log.Println("Room doesn't exists", tempRoom)
 				}
 
 			}
@@ -125,8 +131,10 @@ func (h *Hub) Run() {
 
 				// Room exists
 				h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
-				log.Printf("Joined %s succesfully\n", JoinRoomDetails.roomDetails)
+				JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Joined " + JoinRoomDetails.roomDetails + " Succesfully!!"}
+				log.Println(JoinRoomDetails.clientDetails.Username, " joined ", JoinRoomDetails.roomDetails, " succesfully")
 			} else {
+				JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Room " + JoinRoomDetails.roomDetails + " doesn't exists!!"}
 				log.Printf("%s room doesnt exis\n", JoinRoomDetails.roomDetails)
 			}
 
@@ -139,8 +147,10 @@ func (h *Hub) Run() {
 			if ok {
 
 				delete(h.Rooms[tempRoom], LeaveRoomDetails.clientDetails)
+				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Left " + LeaveRoomDetails.roomDetails + " Succesfully!!"}
 				log.Printf("Left %s succesfully\n", LeaveRoomDetails.roomDetails)
 			} else {
+				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Unable to leave " + LeaveRoomDetails.roomDetails}
 				log.Printf("Couldn't leave %s\n", LeaveRoomDetails.roomDetails)
 			}
 
@@ -152,12 +162,13 @@ func (h *Hub) Run() {
 			var tempRoom Room = Room{name: CreateRoomDetails.roomDetails}
 			_, ok := h.Rooms[tempRoom]
 			if ok {
-
+				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: CreateRoomDetails.roomDetails + " already exists!!"}
 				log.Println("Room already exists")
 			} else {
 				h.Rooms[tempRoom] = map[*Client]bool{}
 				h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
 
+				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
 				log.Println("Room created and joined !! ", tempRoom)
 			}
 		}
