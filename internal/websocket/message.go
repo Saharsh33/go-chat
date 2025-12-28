@@ -11,7 +11,7 @@ const (
 	MsgBroadcast   MessageType = "broadcast"
 
 	// server → client
-	MsgSystem MessageType = "system" //not added for now
+	MsgSystem MessageType = "system"
 )
 
 type Message struct {
