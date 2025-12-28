@@ -60,12 +60,11 @@ func (h *Hub) Run() {
 
 			switch message.Type {
 
-			case "broadcast":
+			case MsgBroadcast:
 
 				// Send message to all clients
 				message.Room = "/Broadcast"
 				for _, client := range h.Clients {
-
 					select {
 
 					case client.Send <- message:
@@ -82,7 +81,7 @@ func (h *Hub) Run() {
 					}
 				}
 
-			case "messageRoom":
+			case MsgRoomMessage:
 
 				// Send message to particular room
 				var tempRoom Room = Room{name: message.Room}
@@ -162,6 +161,5 @@ func (h *Hub) Run() {
 				log.Println("Room created and joined !! ", tempRoom)
 			}
 		}
-
 	}
 }
