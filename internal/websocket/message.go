@@ -1,8 +1,22 @@
 package websocket
 
+type MessageType string
+
+const (
+	// client → server
+	MsgJoinRoom    MessageType = "join"
+	MsgLeaveRoom   MessageType = "leave"
+	MsgCreateRoom  MessageType = "create"
+	MsgRoomMessage MessageType = "messageRoom"
+	MsgBroadcast   MessageType = "broadcast"
+
+	// server → client
+	MsgSystem MessageType = "system"
+)
+
 type Message struct {
-	Type    string `json:"type"`
-	User    string `json:"user"`
-	Room    string `json:"room"`
-	Content string `json:"content"`
+	Type    MessageType `json:"type"`
+	User    string      `json:"user"`
+	Room    string      `json:"room"`
+	Content string      `json:"content"`
 }

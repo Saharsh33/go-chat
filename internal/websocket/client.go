@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -15,17 +16,22 @@ type Client struct {
 
 // readpump can detect disconnection error
 func (c *Client) readPump(h *Hub) {
+
+	//cleanup after disconnection
 	defer func() {
 		h.Unregister <- c
 		c.Conn.Close()
 	}()
 
+	//readpump logic
 	for {
 		_, raw, err := c.Conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
 			break
 		}
+
+		//check if valid JSON
 		var msg Message
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			log.Println("invalid json:", err)
@@ -34,19 +40,30 @@ func (c *Client) readPump(h *Hub) {
 		msg.User = c.Username
 		var roomOpsDetails RoomOps = RoomOps{clientDetails: c, roomDetails: msg.Room}
 
+		//different cases of message types
 		switch msg.Type {
-		case "join":
+
+		//join room
+		case MsgJoinRoom:
 			h.JoinRoom <- roomOpsDetails
-		case "leave":
+
+		//leave room
+		case MsgLeaveRoom:
 			h.LeaveRoom <- roomOpsDetails
-		case "create":
+
+		//create room
+		case MsgCreateRoom:
 			log.Printf("Sent for room creation!! %+v", roomOpsDetails)
 			h.CreateRoom <- roomOpsDetails
-		case "messageRoom":
-			h.Broadcast <- msg
-		case "broadcast":
-			h.Broadcast <- msg //send msg for broadcasting
-			// log.Println("Message sent for broadcasting:-", string(msg))
+
+		//message in a particular room
+		case MsgRoomMessage:
+			h.SendMessage <- msg
+
+		//send to broadcast channel
+		case MsgBroadcast:
+			h.SendMessage <- msg
+
 		default:
 			fmt.Println("invalid Request:")
 		}
@@ -55,14 +72,19 @@ func (c *Client) readPump(h *Hub) {
 }
 
 func (c *Client) writePump() {
+
+	//cleanup after disconnection
 	defer c.Conn.Close()
 
+	//writepump logic
 	for message := range c.Send {
+
 		data, err := json.Marshal(message)
 		if err != nil {
 			log.Println("marshal error:", err)
 			continue
 		}
+
 		err = c.Conn.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
 			log.Println(err)

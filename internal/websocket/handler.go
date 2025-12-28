@@ -19,12 +19,14 @@ var upgrader = websocket.Upgrader{
 
 func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 
-	//upgrading from http to websocket
+	// This function gets called when client send http req to server
+	// upgrading from http to websocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
+
 	//create client
 	client := &Client{
 		Conn:     conn,
@@ -35,6 +37,7 @@ func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 	//register client
 	h.Register <- client
 
+	// Reading and writing msgs to client till connection closes
 	go client.writePump()
 	go client.readPump(h)
 }
