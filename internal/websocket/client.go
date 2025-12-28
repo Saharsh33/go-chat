@@ -44,24 +44,24 @@ func (c *Client) readPump(h *Hub) {
 		switch msg.Type {
 
 		//join room
-		case "join":
+		case MsgJoinRoom:
 			h.JoinRoom <- roomOpsDetails
 
 		//leave room
-		case "leave":
+		case MsgLeaveRoom:
 			h.LeaveRoom <- roomOpsDetails
 
 		//create room
-		case "create":
+		case MsgCreateRoom:
 			log.Printf("Sent for room creation!! %+v", roomOpsDetails)
 			h.CreateRoom <- roomOpsDetails
 
 		//message in a particular room
-		case "messageRoom":
+		case MsgRoomMessage:
 			h.SendMessage <- msg
 
 		//send to broadcast channel
-		case "broadcast":
+		case MsgBroadcast:
 			h.SendMessage <- msg
 
 		default:
