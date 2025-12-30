@@ -1,7 +1,10 @@
 package websocket
 
-import "log"
-
+import (
+	"chat-server/internal/models"
+	"chat-server/internal/storage"
+	"log"
+)
 type Hub struct {
 
 	//string is username
@@ -17,9 +20,10 @@ type Hub struct {
 	Register    chan *Client
 	Unregister  chan *Client
 	SendMessage chan Message
+	Store 		storage.MessageStore
 }
 
-func NewHub() *Hub {
+func NewHub(store storage.MessageStore) *Hub {
 	return &Hub{
 		Clients:     make(map[string]*Client),
 		Rooms:       make(map[Room]map[*Client]bool),
@@ -29,11 +33,13 @@ func NewHub() *Hub {
 		Register:    make(chan *Client),
 		Unregister:  make(chan *Client),
 		SendMessage: make(chan Message),
+		Store: 		 store,
 	}
 }
 
 func (h *Hub) Run() {
-
+	// Initial fetching
+	
 	for {
 
 		select {
@@ -82,6 +88,7 @@ func (h *Hub) Run() {
 						delete(h.Clients, client.Username)
 					}
 				}
+				//h.Store.SaveMessage(models.Message{ID:,Type:,Room:,User:,Content:,CreatedAt:})
 				h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Message sent to broadcast"}
 
 			case MsgRoomMessage:
