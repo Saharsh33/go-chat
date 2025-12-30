@@ -51,9 +51,12 @@ func (h *Hub) Run() {
 			h.Clients[client.Username] = client
 			roomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
 			if err != nil {
-				log.Println("Can't fetch user's joined room details")
+				log.Println("Can't fetch user's joined room details ", err)
 			} else {
 				for _, room := range roomsOfUser {
+					if (h.Rooms[Room{name: room.Name}] == nil) {
+						h.Rooms[Room{name: room.Name}] = map[*Client]bool{}
+					}
 					h.Rooms[Room{name: room.Name}][client] = true
 				}
 				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
@@ -146,7 +149,7 @@ func (h *Hub) Run() {
 
 			if ok2 != nil {
 
-				log.Println("Unable to find room!!(DB Query error)")
+				log.Println("Unable to find room!!(DB Query error)", ok2)
 
 			} else {
 
@@ -155,6 +158,10 @@ func (h *Hub) Run() {
 					err := h.store.AddUserToRoom(room.ID, JoinRoomDetails.clientDetails.Username)
 
 					if err == nil {
+
+						if h.Rooms[tempRoom] == nil {
+							h.Rooms[tempRoom] = map[*Client]bool{}
+						}
 
 						h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
 						JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Joined " + JoinRoomDetails.roomDetails + " Succesfully!!"}

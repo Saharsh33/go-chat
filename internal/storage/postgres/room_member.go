@@ -5,22 +5,23 @@ import (
 	"log"
 )
 
+// adding user with given name(which is unique) to the room
+const AddUserToRoomQuery = `INSERT INTO room_members (room_id, username) VALUES ($1, $2)`
 
-//adding user with given name(which is unique) to the room
-const AddUserToRoomQuery=`INSERT INTO room_members (room_id, username) VALUES ($1, $2)`
+// removing user with given name(which is unique) from the room
+const RemoveUserFromRoomQuery = `DELETE FROM room_members WHERE room_id = $1 AND username = $2`
 
-//removing user with given name(which is unique) from the room
-const RemoveUserFromRoomQuery=`DELETE FROM room_members WHERE room_id = $1 AND username = $2`
+// get all the users in the room with given id
+const GetUsersInRoomQuery = `SELECT * FROM room_members WHERE room_id = $1`
 
-//get all the users in the room with given id
-const GetUsersInRoomQuery=`SELECT * FROM room_members WHERE room_id = $1`
+// fetching all rooms of a user
+const GetAllRoomsOfUserQuery = `SELECT room_id,username
+		 FROM room_members
+		 WHERE username=$1
+		 ORDER BY username ASC`
 
-//fetching all rooms of a user
-const GetAllRoomsOfUserQuery = `SELECT *
-		 FROM roomMembers
-		 ORDER BY name ASC`
-//add user to room if err==nil means user is added
-func (s *Store) AddUserToRoom(roomId int , username string) error{
+// add user to room if err==nil means user is added
+func (s *Store) AddUserToRoom(roomId int, username string) error {
 	_, err := s.db.Exec(
 		AddUserToRoomQuery,
 		roomId,
@@ -29,8 +30,8 @@ func (s *Store) AddUserToRoom(roomId int , username string) error{
 	return err
 }
 
-//delete user to room if err==nil means user is added
-func (s *Store) RemoveUserFromRoom(roomId int, username string) error{
+// delete user to room if err==nil means user is added
+func (s *Store) RemoveUserFromRoom(roomId int, username string) error {
 	_, err := s.db.Exec(
 		RemoveUserFromRoomQuery,
 		roomId,
@@ -39,14 +40,13 @@ func (s *Store) RemoveUserFromRoom(roomId int, username string) error{
 	return err
 }
 
-
-func (s *Store) GetUsersInRoom(roomId int) ([]*models.RoomMember, error){
+func (s *Store) GetUsersInRoom(roomId int) ([]*models.RoomMember, error) {
 	rows, err := s.db.Query(
 		GetUsersInRoomQuery,
 		roomId,
 	)
 	if err != nil {
-		log.Println("Can't fetch users from room with id ",roomId)
+		log.Println("Can't fetch users from room with id ", roomId)
 		return nil, err
 	}
 	defer rows.Close()
@@ -66,7 +66,7 @@ func (s *Store) GetUsersInRoom(roomId int) ([]*models.RoomMember, error){
 }
 
 func (s *Store) GetRoomsOfUser(username string) ([]*models.StoredRoom, error) {
-	rows, err := s.db.Query(GetAllRoomsOfUserQuery,username)
+	rows, err := s.db.Query(GetAllRoomsOfUserQuery, username)
 	if err != nil {
 		return nil, err
 	}
