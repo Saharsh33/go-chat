@@ -1,10 +1,10 @@
 package websocket
 
 import (
-	"chat-server/internal/models"
 	"chat-server/internal/storage"
 	"log"
 )
+
 type Hub struct {
 
 	//string is username
@@ -20,10 +20,10 @@ type Hub struct {
 	Register    chan *Client
 	Unregister  chan *Client
 	SendMessage chan Message
-	Store 		storage.MessageStore
+	store       storage.StorageInterface
 }
 
-func NewHub(store storage.MessageStore) *Hub {
+func NewHub(store storage.StorageInterface) *Hub {
 	return &Hub{
 		Clients:     make(map[string]*Client),
 		Rooms:       make(map[Room]map[*Client]bool),
@@ -33,13 +33,14 @@ func NewHub(store storage.MessageStore) *Hub {
 		Register:    make(chan *Client),
 		Unregister:  make(chan *Client),
 		SendMessage: make(chan Message),
-		Store: 		 store,
+		store:       store,
 	}
 }
 
 func (h *Hub) Run() {
-	// Initial fetching
-	
+	log.Println("Preparing HUB!!")
+
+	log.Println("HUB running!")
 	for {
 
 		select {
@@ -48,7 +49,15 @@ func (h *Hub) Run() {
 
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
-			client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
+			roomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
+			if err != nil {
+				log.Println("Can't fetch user's joined room details")
+			} else {
+				for _, room := range roomsOfUser {
+					h.Rooms[Room{name: room.Name}][client] = true
+				}
+				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
+			}
 
 		case client := <-h.Unregister:
 
@@ -132,17 +141,36 @@ func (h *Hub) Run() {
 
 			// Join a room
 			var tempRoom Room = Room{name: JoinRoomDetails.roomDetails}
-			_, ok := h.Rooms[tempRoom]
 
-			if ok {
+			room, ok2 := h.store.GetRoomByName(tempRoom.name)
 
-				// Room exists
-				h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
-				JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Joined " + JoinRoomDetails.roomDetails + " Succesfully!!"}
-				log.Println(JoinRoomDetails.clientDetails.Username, " joined ", JoinRoomDetails.roomDetails, " succesfully")
+			if ok2 != nil {
+
+				log.Println("Unable to find room!!(DB Query error)")
+
 			} else {
-				JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Room " + JoinRoomDetails.roomDetails + " doesn't exists!!"}
-				log.Printf("%s room doesnt exis\n", JoinRoomDetails.roomDetails)
+
+				if room != nil {
+
+					err := h.store.AddUserToRoom(room.ID, JoinRoomDetails.clientDetails.Username)
+
+					if err == nil {
+
+						h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
+						JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Joined " + JoinRoomDetails.roomDetails + " Succesfully!!"}
+						log.Println(JoinRoomDetails.clientDetails.Username, " joined ", JoinRoomDetails.roomDetails, " succesfully")
+
+					} else {
+
+						log.Println("DB Query error : Couldn't add ", JoinRoomDetails.clientDetails.Username, " to ", JoinRoomDetails.roomDetails)
+
+					}
+
+				} else {
+
+					log.Println("No such room found!!")
+
+				}
 			}
 
 		case LeaveRoomDetails := <-h.LeaveRoom:
@@ -153,10 +181,30 @@ func (h *Hub) Run() {
 
 			if ok {
 
-				delete(h.Rooms[tempRoom], LeaveRoomDetails.clientDetails)
-				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Left " + LeaveRoomDetails.roomDetails + " Succesfully!!"}
-				log.Printf("Left %s succesfully\n", LeaveRoomDetails.roomDetails)
+				room, ok2 := h.store.GetRoomByName(tempRoom.name)
+
+				if ok2 != nil {
+
+					log.Println("DB error room not found 102")
+
+				} else {
+
+					err := h.store.RemoveUserFromRoom(room.ID, LeaveRoomDetails.clientDetails.Username)
+
+					if err != nil {
+
+						log.Println("DB error code 101")
+
+					} else {
+
+						delete(h.Rooms[tempRoom], LeaveRoomDetails.clientDetails)
+
+						LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Left " + LeaveRoomDetails.roomDetails + " Succesfully!!"}
+						log.Printf("Left %s succesfully\n", LeaveRoomDetails.roomDetails)
+					}
+				}
 			} else {
+
 				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Unable to leave " + LeaveRoomDetails.roomDetails}
 				log.Printf("Couldn't leave %s\n", LeaveRoomDetails.roomDetails)
 			}
@@ -167,16 +215,30 @@ func (h *Hub) Run() {
 			log.Println("Recieved for room creation!!")
 
 			var tempRoom Room = Room{name: CreateRoomDetails.roomDetails}
-			_, ok := h.Rooms[tempRoom]
-			if ok {
+			_, ok1 := h.Rooms[tempRoom]
+
+			if ok1 {
+
 				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: CreateRoomDetails.roomDetails + " already exists!!"}
 				log.Println("Room already exists")
-			} else {
-				h.Rooms[tempRoom] = map[*Client]bool{}
-				h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
 
-				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
-				log.Println("Room created and joined !! ", tempRoom)
+			} else {
+
+				if _, ok2 := h.store.GetRoomByName(tempRoom.name); ok2 != nil {
+
+					CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: CreateRoomDetails.roomDetails + " already exists!!"}
+					log.Println("Room already exists")
+
+				} else {
+
+					result := h.store.CreateRoom(CreateRoomDetails.roomDetails)
+					tempRoom = Room{name: result.Name}
+					h.Rooms[tempRoom] = map[*Client]bool{}
+					h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
+
+					CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
+					log.Println("Room created and joined !! ", tempRoom)
+				}
 			}
 		}
 	}

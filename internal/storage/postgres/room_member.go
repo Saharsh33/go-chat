@@ -5,11 +5,24 @@ import (
 	"log"
 )
 
+
+//adding user with given name(which is unique) to the room
+const AddUserToRoomQuery=`INSERT INTO room_members (room_id, username) VALUES ($1, $2)`
+
+//removing user with given name(which is unique) from the room
+const RemoveUserFromRoomQuery=`DELETE FROM room_members WHERE room_id = $1 AND username = $2`
+
+//get all the users in the room with given id
+const GetUsersInRoomQuery=`SELECT * FROM room_members WHERE room_id = $1`
+
+//fetching all rooms of a user
+const GetAllRoomsOfUserQuery = `SELECT *
+		 FROM roomMembers
+		 ORDER BY name ASC`
 //add user to room if err==nil means user is added
 func (s *Store) AddUserToRoom(roomId int , username string) error{
 	_, err := s.db.Exec(
-		`INSERT INTO roomMembers (room_id, username)
-		 VALUES ($1, $2)`,
+		AddUserToRoomQuery,
 		roomId,
 		username,
 	)
@@ -19,8 +32,7 @@ func (s *Store) AddUserToRoom(roomId int , username string) error{
 //delete user to room if err==nil means user is added
 func (s *Store) RemoveUserFromRoom(roomId int, username string) error{
 	_, err := s.db.Exec(
-		`DELETE FROM roomMembers 
-		WHERE room_id=$1 AND username=$2`,
+		RemoveUserFromRoomQuery,
 		roomId,
 		username,
 	)
@@ -30,10 +42,8 @@ func (s *Store) RemoveUserFromRoom(roomId int, username string) error{
 
 func (s *Store) GetUsersInRoom(roomId int) ([]*models.RoomMember, error){
 	rows, err := s.db.Query(
-		`SELECT *
-		 FROM roomMembers
-		 WHERE room_id=$1`,
-		 roomId,
+		GetUsersInRoomQuery,
+		roomId,
 	)
 	if err != nil {
 		log.Println("Can't fetch users from room with id ",roomId)
@@ -53,4 +63,24 @@ func (s *Store) GetUsersInRoom(roomId int) ([]*models.RoomMember, error){
 		members = append(members, &m)
 	}
 	return members, nil
+}
+
+func (s *Store) GetRoomsOfUser(username string) ([]*models.StoredRoom, error) {
+	rows, err := s.db.Query(GetAllRoomsOfUserQuery,username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rooms []*models.StoredRoom
+	for rows.Next() {
+		var r models.StoredRoom
+		if err := rows.Scan(
+			&r.ID,
+			&r.Name,
+		); err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, &r)
+	}
+	return rooms, nil
 }

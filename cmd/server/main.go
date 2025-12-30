@@ -17,15 +17,11 @@ func main() {
 	cfg := config.Load()
 
 	// 2. Connect to Postgres (ONLY here)
-	db, err := postgres.NewDB(cfg.PostgresDSN)
-	if err != nil {
-		log.Fatal("db open error:", err)
+	db := postgres.NewDB(cfg.PostgresDSN)
+	if(db==nil){
+		panic("DB connection failed!!");
 	}
-
-	// if err := db.Ping(); err != nil {
-	// 	log.Fatal("db ping error:", err)
-	// }
-	// log.Println("Connected to Postgres")
+	log.Println("Connected to Postgres")
 
 	// 3. Create message store
 	store := postgres.NewStore(db)
