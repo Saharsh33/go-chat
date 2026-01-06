@@ -56,7 +56,6 @@ func (h *Hub) Run() {
 				log.Println("Can't fetch user's joined room details ", err)
 			} else {
 				for _, room := range roomsOfUser {
-					log.Println(room)
 					if (h.Rooms[Room{name: room.Name}] == nil) {
 						h.Rooms[Room{name: room.Name}] = map[*Client]bool{}
 					}
@@ -80,6 +79,12 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.SendMessage:
+
+			err := h.store.SaveMessage(message.Content, 3, message.User)
+			if err != nil {
+				log.Println("Can't Save message!! ", err)
+				break
+			}
 
 			switch message.Type {
 

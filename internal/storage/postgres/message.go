@@ -4,8 +4,7 @@ import (
 	"chat-server/internal/models"
 )
 
-
-const SaveMessageQuery = `INSERT INTO messages (room, username, content)
+const SaveMessageQuery = `INSERT INTO messages (room_id, username, content)
 		 VALUES ($1, $2, $3)`
 
 const GetRecentMessagesQuery = `SELECT id, room, username, content, created_at
@@ -14,13 +13,12 @@ const GetRecentMessagesQuery = `SELECT id, room, username, content, created_at
 		 ORDER BY created_at DESC
 		 LIMIT $2`
 
-		 
-func (s *Store) SaveMessage(msg models.Message) error {
+func (s *Store) SaveMessage(msg string, roomId int, userName string) error {
 	_, err := s.db.Exec(
 		SaveMessageQuery,
-		msg.Room,
-		msg.User,
-		msg.Content,
+		roomId,
+		userName,
+		msg,
 	)
 	return err
 }

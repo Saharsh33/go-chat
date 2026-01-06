@@ -3,9 +3,11 @@ package storage
 import "chat-server/internal/models"
 
 type StorageInterface interface {
-	SaveMessage(msg models.Message) error
+
+	//message operations
 
 	//limit=20=>last 20 messages
+	SaveMessage(msg string, roomId int, userName string) error
 	GetRecentMessages(room string, limit int) ([]models.Message, error)
 
 	//user operations

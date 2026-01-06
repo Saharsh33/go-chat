@@ -7,4 +7,3 @@ type RoomOps struct {
 	clientDetails *Client
 	roomDetails   string
 }
-
