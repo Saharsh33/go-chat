@@ -1,6 +1,6 @@
 CREATE TABLE messages (
     id SERIAL PRIMARY KEY,
-    room TEXT NOT NULL,
+    room_id INT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     username TEXT NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()

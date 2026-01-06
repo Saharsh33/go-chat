@@ -1,0 +1,4 @@
+CREATE TABLE users (
+  username TEXT PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

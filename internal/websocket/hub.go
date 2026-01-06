@@ -47,6 +47,8 @@ func (h *Hub) Run() {
 
 		case client := <-h.Register:
 
+			h.store.CreateUserIfNotExists(client.Username)
+
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
 			roomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
@@ -54,6 +56,7 @@ func (h *Hub) Run() {
 				log.Println("Can't fetch user's joined room details ", err)
 			} else {
 				for _, room := range roomsOfUser {
+					log.Println(room)
 					if (h.Rooms[Room{name: room.Name}] == nil) {
 						h.Rooms[Room{name: room.Name}] = map[*Client]bool{}
 					}
@@ -155,7 +158,7 @@ func (h *Hub) Run() {
 
 				if room != nil {
 
-					err := h.store.AddUserToRoom(room.ID, JoinRoomDetails.clientDetails.Username)
+					err := h.store.AddUserToRoom(room.ID, JoinRoomDetails.clientDetails.Username, room.Name)
 
 					if err == nil {
 

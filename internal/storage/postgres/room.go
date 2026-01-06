@@ -27,7 +27,7 @@ func (s *Store) CreateRoom(room string, name string) (*models.StoredRoom, error)
 		log.Println(err)
 		return nil, err
 	}
-	err = s.AddUserToRoom(result.ID, name)
+	err = s.AddUserToRoom(result.ID, name, room)
 	if err != nil {
 		log.Println(err)
 		return nil, err
