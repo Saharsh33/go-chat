@@ -5,6 +5,8 @@ import (
 	"log"
 )
 
+const LIMIT int = 20
+
 type Hub struct {
 
 	//string is username
@@ -60,6 +62,19 @@ func (h *Hub) Run() {
 						h.Rooms[Room{name: room.Name}] = map[*Client]bool{}
 					}
 					h.Rooms[Room{name: room.Name}][client] = true
+					DBroom, err := h.store.GetRoomByName(room.Name)
+					if err != nil {
+						log.Println("code : 104", err)
+					}
+					messages, err := h.store.GetRecentMessages(DBroom.ID, LIMIT)
+					if err != nil {
+						log.Println("code : 103", err)
+					} else {
+						for _, messagesOfRoom := range messages {
+							client.Send <- Message{Type: MsgRoomMessage, User: messagesOfRoom.User, Room: messagesOfRoom.Room, Content: messagesOfRoom.Content}
+						}
+					}
+					client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
 				}
 				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
 			}

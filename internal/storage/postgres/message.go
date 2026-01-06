@@ -7,9 +7,9 @@ import (
 const SaveMessageQuery = `INSERT INTO messages (room_id, username, content)
 		 VALUES ($1, $2, $3)`
 
-const GetRecentMessagesQuery = `SELECT id, room, username, content, created_at
+const GetRecentMessagesQuery = `SELECT id, room_id, username, content, created_at
 		 FROM messages
-		 WHERE room = $1
+		 WHERE room_id = $1
 		 ORDER BY created_at DESC
 		 LIMIT $2`
 
@@ -23,10 +23,10 @@ func (s *Store) SaveMessage(msg string, roomId int, userName string) error {
 	return err
 }
 
-func (s *Store) GetRecentMessages(room string, limit int) ([]models.Message, error) {
+func (s *Store) GetRecentMessages(roomId int, limit int) ([]models.Message, error) {
 	rows, err := s.db.Query(
 		GetRecentMessagesQuery,
-		room,
+		roomId,
 		limit,
 	)
 	if err != nil {
