@@ -16,7 +16,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var temp int = 1
+var temp int = 0
 
 func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 
