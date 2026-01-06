@@ -9,10 +9,10 @@ type StorageInterface interface {
 	GetRecentMessages(room string, limit int) ([]models.Message, error)
 
 	//room operations
-	CreateRoom(name string) *models.StoredRoom
+	CreateRoom(room string, name string) (*models.StoredRoom, error)
 	GetRoomByName(name string) (*models.StoredRoom, error)
 	GetAllRooms() ([]*models.StoredRoom, error)
-	
+
 	//room-user operations
 	AddUserToRoom(roomId int, username string) error
 	RemoveUserFromRoom(roomId int, username string) error

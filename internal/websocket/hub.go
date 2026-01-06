@@ -238,13 +238,21 @@ func (h *Hub) Run() {
 
 				} else {
 
-					result := h.store.CreateRoom(CreateRoomDetails.roomDetails)
-					tempRoom = Room{name: result.Name}
-					h.Rooms[tempRoom] = map[*Client]bool{}
-					h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
+					result, err := h.store.CreateRoom(CreateRoomDetails.roomDetails, CreateRoomDetails.clientDetails.Username)
+					if err != nil {
 
-					CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
-					log.Println("Room created and joined !! ", tempRoom)
+						log.Println(err)
+
+					} else {
+
+						tempRoom = Room{name: result.Name}
+						h.Rooms[tempRoom] = map[*Client]bool{}
+						h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
+
+						CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
+						log.Println("Room created and joined !! ", tempRoom)
+
+					}
 				}
 			}
 		}

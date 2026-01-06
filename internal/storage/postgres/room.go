@@ -20,9 +20,14 @@ const GetRoomByNameQuery = `SELECT id,name
 		 FROM rooms
 		 WHERE name = $1`
 
-func (s *Store) CreateRoom(room string) *models.StoredRoom {
+func (s *Store) CreateRoom(room string, name string) *models.StoredRoom {
 	var result models.StoredRoom
 	err := s.db.QueryRow(RoomCreateQuery, room).Scan(&result.ID, &result.Name)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	err = s.AddUserToRoom(result.ID, name)
 	if err != nil {
 		log.Println(err)
 		return nil
