@@ -38,21 +38,27 @@ func (c *Client) readPump(h *Hub) {
 			continue
 		}
 		msg.User = c.Username
-		var roomOpsDetails RoomOps = RoomOps{clientDetails: c, roomDetails: msg.Room}
+		roomId := msg.Room
 
 		//different cases of message types
 		switch msg.Type {
 
 		//join room
 		case MsgJoinRoom:
+			// room name will be null and not considered
+			roomOpsDetails := RoomOps{clientDetails: c, roomDetails: roomId, roomName: msg.Content}
 			h.JoinRoom <- roomOpsDetails
 
 		//leave room
 		case MsgLeaveRoom:
+			// room name will be null and not considered
+			roomOpsDetails := RoomOps{clientDetails: c, roomDetails: roomId, roomName: msg.Content}
 			h.LeaveRoom <- roomOpsDetails
 
 		//create room
 		case MsgCreateRoom:
+			// room id will be null and not considered
+			roomOpsDetails := RoomOps{clientDetails: c, roomDetails: roomId, roomName: msg.Content}
 			log.Printf("Sent for room creation!! %+v", roomOpsDetails)
 			h.CreateRoom <- roomOpsDetails
 
@@ -62,6 +68,9 @@ func (c *Client) readPump(h *Hub) {
 
 		//send to broadcast channel
 		case MsgBroadcast:
+			h.SendMessage <- msg
+		
+		case MsgDirectMessage:
 			h.SendMessage <- msg
 
 		default:

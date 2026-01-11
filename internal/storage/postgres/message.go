@@ -4,11 +4,11 @@ import (
 	"chat-server/internal/models"
 )
 
-const SaveMessageQuery = `INSERT INTO messages (room_id, username, content)
+const SaveMessageQuery = `INSERT INTO roommessages (room_id, username, content)
 		 VALUES ($1, $2, $3)`
 
 const GetRecentMessagesQuery = `SELECT id, room_id, username, content, created_at
-		 FROM messages
+		 FROM roommessages
 		 WHERE room_id = $1
 		 ORDER BY created_at DESC
 		 LIMIT $2`

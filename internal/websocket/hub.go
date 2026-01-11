@@ -3,19 +3,24 @@ package websocket
 import (
 	"chat-server/internal/storage"
 	"log"
+	"strconv"
 )
 
 const LIMIT int = 20
 
 type Hub struct {
 
-	//string is username
+	//username to client struct
 	Clients map[string]*Client
 
-	// Channels to handle server operations concurrently
-	Rooms map[Room]map[*Client]bool
+	Rooms map[int]Room
 
-	//go-channels for different operations
+	// room to client
+	UsersOfRoom map[int]map[string]struct{} // int to username   try to make it int to int
+	// client to room
+	RoomsOfUser map[string]map[int]struct{}
+	// Channels to handle server operations concurrently
+
 	JoinRoom    chan RoomOps
 	LeaveRoom   chan RoomOps
 	CreateRoom  chan RoomOps
@@ -28,7 +33,8 @@ type Hub struct {
 func NewHub(store storage.StorageInterface) *Hub {
 	return &Hub{
 		Clients:     make(map[string]*Client),
-		Rooms:       make(map[Room]map[*Client]bool),
+		UsersOfRoom: make(map[int]map[string]struct{}),
+		RoomsOfUser: make(map[string]map[int]struct{}),
 		JoinRoom:    make(chan RoomOps),
 		LeaveRoom:   make(chan RoomOps),
 		CreateRoom:  make(chan RoomOps),
@@ -40,33 +46,29 @@ func NewHub(store storage.StorageInterface) *Hub {
 }
 
 func (h *Hub) Run() {
-	log.Println("Preparing HUB!!")
-
 	log.Println("HUB running!")
+
 	for {
 
 		select {
 
 		case client := <-h.Register:
 
-			h.store.CreateUserIfNotExists(client.Username)
+			h.store.CreateUserIfNotExists(client.Username) // Should be handled somewhere else
 
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
-			roomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
+			h.RoomsOfUser[client.Username]=map[int]struct{}{}
+			DBroomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
 			if err != nil {
 				log.Println("Can't fetch user's joined room details ", err)
 			} else {
-				for _, room := range roomsOfUser {
-					if (h.Rooms[Room{name: room.Name}] == nil) {
-						h.Rooms[Room{name: room.Name}] = map[*Client]bool{}
+				for _, room := range DBroomsOfUser {
+					if (h.UsersOfRoom[room.ID] == nil) {
+						h.UsersOfRoom[room.ID] = map[string]struct{}{}
 					}
-					h.Rooms[Room{name: room.Name}][client] = true
-					DBroom, err := h.store.GetRoomByName(room.Name)
-					if err != nil {
-						log.Println("code : 104", err)
-					}
-					messages, err := h.store.GetRecentMessages(DBroom.ID, LIMIT)
+					h.UsersOfRoom[room.ID][client.Username] = struct{}{} //change the structure of the map
+					messages, err := h.store.GetRecentMessages(room.ID, LIMIT)
 					if err != nil {
 						log.Println("code : 103", err)
 					} else {
@@ -74,9 +76,9 @@ func (h *Hub) Run() {
 							client.Send <- Message{Type: MsgRoomMessage, User: messagesOfRoom.User, Room: messagesOfRoom.Room, Content: messagesOfRoom.Content}
 						}
 					}
-					client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
+					client.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: client.Username + " Registered Successfully"}
 				}
-				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Registered Successfully"}
+				client.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: client.Username + " Registered Successfully"}
 			}
 
 		case client := <-h.Unregister:
@@ -85,17 +87,21 @@ func (h *Hub) Run() {
 			if _, ok := h.Clients[client.Username]; ok {
 				//client exists
 				delete(h.Clients, client.Username)
-				for _, clients := range h.Rooms {
-					delete(clients, client)
+				for room, _ := range h.RoomsOfUser[client.Username] {
+					delete(h.UsersOfRoom[room],client.Username)
+					// check if room is empty
 				}
-				client.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: client.Username + " Unregistered Successfully"}
+				delete(h.RoomsOfUser,client.Username)
+				client.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: client.Username + " Unregistered Successfully"}
 				// close send channel
 				close(client.Send)
+			} else {
+				log.Println("Client doesn't exist in map")
 			}
 
 		case message := <-h.SendMessage:
 
-			err := h.store.SaveMessage(message.Content, 3, message.User)
+			err := h.store.SaveMessage(message.Content, message.Room, message.User)
 			if err != nil {
 				log.Println("Can't Save message!! ", err)
 				break
@@ -106,7 +112,7 @@ func (h *Hub) Run() {
 			case MsgBroadcast:
 
 				// Send message to all clients
-				message.Room = "/Broadcast"
+				message.Room = 0
 				for _, client := range h.Clients {
 					select {
 
@@ -116,127 +122,134 @@ func (h *Hub) Run() {
 						//if client is slow or dead
 						close(client.Send)
 
-						for _, clients := range h.Rooms {
-							delete(clients, client)
-						}
-
 						delete(h.Clients, client.Username)
+						for room, _ := range h.RoomsOfUser[client.Username] {
+							delete(h.UsersOfRoom[room],client.Username)
+							// check if room is empty
+						}
+						delete(h.RoomsOfUser,client.Username)
 					}
 				}
 				//h.Store.SaveMessage(models.Message{ID:,Type:,Room:,User:,Content:,CreatedAt:})
-				h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Message sent to broadcast"}
+				h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Message sent to broadcast"}
 
 			case MsgRoomMessage:
-
+				roomId:=message.Room
 				// Send message to particular room
-				var tempRoom Room = Room{name: message.Room}
-				_, ok1 := h.Rooms[tempRoom]
+				_, ok1 := h.UsersOfRoom[roomId]
 
 				if ok1 {
 
 					// If room exists
-					_, ok2 := h.Rooms[tempRoom][h.Clients[message.User]]
+					_, ok2 := h.UsersOfRoom[roomId][message.User]
 
 					if ok2 {
 
 						// If client exists in that room
-						for client := range h.Rooms[Room{name: message.Room}] {
+						for user := range h.UsersOfRoom[roomId] {
 
 							//for all clients in the room
+							client:=h.Clients[user]
 							select {
 
 							case client.Send <- message:
 
 							default:
-								close(client.Send) //if client is slow or dead
+								close(client.Send)
+
 								delete(h.Clients, client.Username)
+								for room, _ := range h.RoomsOfUser[client.Username] {
+									delete(h.UsersOfRoom[room],client.Username)
+									// check if room is empty
+								}
+								delete(h.RoomsOfUser,client.Username)
 							}
 						}
-						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Message sent"}
+						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Message sent"}
 					} else {
-						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "User not part of room"}
-						log.Println(message.User, " is not in the room:-", tempRoom.name)
+						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "User not part of room"}
+						log.Println(message.User, " is not in the room:-", message.Room)
 					}
 				} else {
-					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Room " + message.Room + " doesn't exist"}
-					log.Println("Room doesn't exists", tempRoom)
+					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Room " + strconv.Itoa(message.Room) + " doesn't exist"}
+					log.Println("Room doesn't exists", message.Room)
 				}
 
+			case MsgDirectMessage:
+				// send direct msg
+				
 			}
 		case JoinRoomDetails := <-h.JoinRoom:
 
 			// Join a room
-			var tempRoom Room = Room{name: JoinRoomDetails.roomDetails}
+			flag := false
+			_, ok2 := h.UsersOfRoom[JoinRoomDetails.roomDetails]
 
-			room, ok2 := h.store.GetRoomByName(tempRoom.name)
+			if ok2 != true {
 
-			if ok2 != nil {
+				log.Println("Unable to find room in map")
 
-				log.Println("Unable to find room!!(DB Query error)", ok2)
+				_,ok1 := h.store.GetRoomById(JoinRoomDetails.roomDetails)
+				if ok1 ==nil {
+					flag = true
+					h.UsersOfRoom[JoinRoomDetails.roomDetails] = map[string]struct{}{}
+
+				}else{
+					log.Println("No such room found in db!!", ok1)
+				}
 
 			} else {
+				flag = true	
+			}
+			if flag == true {
 
-				if room != nil {
-
-					err := h.store.AddUserToRoom(room.ID, JoinRoomDetails.clientDetails.Username, room.Name)
+					err := h.store.AddUserToRoom(JoinRoomDetails.roomDetails, JoinRoomDetails.clientDetails.Username)
 
 					if err == nil {
 
-						if h.Rooms[tempRoom] == nil {
-							h.Rooms[tempRoom] = map[*Client]bool{}
-						}
-
-						h.Rooms[tempRoom][JoinRoomDetails.clientDetails] = true
-						JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Joined " + JoinRoomDetails.roomDetails + " Succesfully!!"}
+						h.UsersOfRoom[JoinRoomDetails.roomDetails][JoinRoomDetails.clientDetails.Username] = struct{}{}
+						h.RoomsOfUser[JoinRoomDetails.clientDetails.Username][JoinRoomDetails.roomDetails]=struct{}{}
+						JoinRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Joined " + strconv.Itoa(JoinRoomDetails.roomDetails) + " Succesfully!!"}
 						log.Println(JoinRoomDetails.clientDetails.Username, " joined ", JoinRoomDetails.roomDetails, " succesfully")
 
 					} else {
 
-						log.Println("DB Query error : Couldn't add ", JoinRoomDetails.clientDetails.Username, " to ", JoinRoomDetails.roomDetails)
+						log.Println("DB Query error : Couldn't add ", JoinRoomDetails.clientDetails.Username, " to ", JoinRoomDetails.roomDetails, err)
 
 					}
 
-				} else {
+			} else {
 
-					log.Println("No such room found!!")
+				log.Println("No such room found!!")
 
-				}
 			}
 
 		case LeaveRoomDetails := <-h.LeaveRoom:
 
 			// Leave a room
-			var tempRoom Room = Room{name: LeaveRoomDetails.roomDetails}
-			_, ok := h.Rooms[tempRoom]
+			_, ok := h.UsersOfRoom[LeaveRoomDetails.roomDetails]
 
 			if ok {
 
-				room, ok2 := h.store.GetRoomByName(tempRoom.name)
+				err := h.store.RemoveUserFromRoom(LeaveRoomDetails.roomDetails, LeaveRoomDetails.clientDetails.Username)
 
-				if ok2 != nil {
+				if err != nil {
 
-					log.Println("DB error room not found 102")
+					log.Println("DB error code 101")
 
 				} else {
 
-					err := h.store.RemoveUserFromRoom(room.ID, LeaveRoomDetails.clientDetails.Username)
+					delete(h.UsersOfRoom[LeaveRoomDetails.roomDetails], LeaveRoomDetails.clientDetails.Username)
+					delete(h.RoomsOfUser[LeaveRoomDetails.clientDetails.Username], LeaveRoomDetails.roomDetails)
 
-					if err != nil {
-
-						log.Println("DB error code 101")
-
-					} else {
-
-						delete(h.Rooms[tempRoom], LeaveRoomDetails.clientDetails)
-
-						LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Left " + LeaveRoomDetails.roomDetails + " Succesfully!!"}
-						log.Printf("Left %s succesfully\n", LeaveRoomDetails.roomDetails)
-					}
+					LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Left " + strconv.Itoa(LeaveRoomDetails.roomDetails) + " Succesfully!!"}
+					log.Printf("Left %d succesfully\n", LeaveRoomDetails.roomDetails)
 				}
+				
 			} else {
 
-				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Unable to leave " + LeaveRoomDetails.roomDetails}
-				log.Printf("Couldn't leave %s\n", LeaveRoomDetails.roomDetails)
+				LeaveRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Unable to leave " + strconv.Itoa(LeaveRoomDetails.roomDetails)}
+				log.Printf("Couldn't leave %d\n", LeaveRoomDetails.roomDetails)
 			}
 
 		case CreateRoomDetails := <-h.CreateRoom:
@@ -244,40 +257,32 @@ func (h *Hub) Run() {
 			// Create a room
 			log.Println("Recieved for room creation!!")
 
-			var tempRoom Room = Room{name: CreateRoomDetails.roomDetails}
-			_, ok1 := h.Rooms[tempRoom]
+			if _, ok2 := h.store.GetRoomByName(CreateRoomDetails.roomName); ok2 != nil {
 
-			if ok1 {
-
-				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: CreateRoomDetails.roomDetails + " already exists!!"}
+				CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: strconv.Itoa(CreateRoomDetails.roomDetails) + " already exists!!"}
 				log.Println("Room already exists")
 
 			} else {
 
-				if _, ok2 := h.store.GetRoomByName(tempRoom.name); ok2 != nil {
+				result, err := h.store.CreateRoom(CreateRoomDetails.roomName, CreateRoomDetails.clientDetails.Username)
+				
+				if err != nil{
 
-					CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: CreateRoomDetails.roomDetails + " already exists!!"}
-					log.Println("Room already exists")
+					log.Println(err)
 
 				} else {
 
-					result, err := h.store.CreateRoom(CreateRoomDetails.roomDetails, CreateRoomDetails.clientDetails.Username)
-					if err != nil {
+					
+					h.UsersOfRoom[result.ID]=map[string]struct{}{}
+					h.UsersOfRoom[result.ID][CreateRoomDetails.clientDetails.Username]=struct{}{}
+					h.RoomsOfUser[CreateRoomDetails.clientDetails.Username][result.ID]=struct{}{}
 
-						log.Println(err)
+					CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Created  " + strconv.Itoa(CreateRoomDetails.roomDetails) + " Succesfully!!"}
+					log.Println("Room created and joined !! ", result.Name)
 
-					} else {
-
-						tempRoom = Room{name: result.Name}
-						h.Rooms[tempRoom] = map[*Client]bool{}
-						h.Rooms[tempRoom][CreateRoomDetails.clientDetails] = true
-
-						CreateRoomDetails.clientDetails.Send <- Message{Type: MsgSystem, User: "system", Room: "system", Content: "Created  " + CreateRoomDetails.roomDetails + " Succesfully!!"}
-						log.Println("Room created and joined !! ", tempRoom)
-
-					}
 				}
 			}
+			
 		}
 	}
 }

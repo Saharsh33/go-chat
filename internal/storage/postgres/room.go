@@ -6,8 +6,8 @@ import (
 )
 
 // creating room
-const RoomCreateQuery = `INSERT INTO rooms (name)
-		 VALUES ($1) RETURNING id , name`
+const RoomCreateQuery = `INSERT INTO rooms (name, description, created_by)
+		 VALUES ($1, $2, $3) RETURNING id , name`
 
 // fetching all rooms
 const GetAllRoomsQuery = `SELECT *
@@ -20,14 +20,19 @@ const GetRoomByNameQuery = `SELECT id,name
 		 FROM rooms
 		 WHERE name = $1`
 
+const GetRoomByIdQuery = `SELECT id,name
+		 FROM rooms
+		 WHERE id = $1`
+
 func (s *Store) CreateRoom(room string, name string) (*models.StoredRoom, error) {
 	var result models.StoredRoom
-	err := s.db.QueryRow(RoomCreateQuery, room).Scan(&result.ID, &result.Name)
+	roomdescription := ""
+	err := s.db.QueryRow(RoomCreateQuery, room, roomdescription, name).Scan(&result.ID, &result.Name)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	err = s.AddUserToRoom(result.ID, name, room)
+	err = s.AddUserToRoom(result.ID, name)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -38,6 +43,23 @@ func (s *Store) CreateRoom(room string, name string) (*models.StoredRoom, error)
 
 func (s *Store) GetRoomByName(room string) (*models.StoredRoom, error) {
 	DBroom, err := s.db.Query(GetRoomByNameQuery, room)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	var r models.StoredRoom
+	for DBroom.Next() {
+		if err := DBroom.Scan(
+			&r.ID,
+			&r.Name,
+		); err != nil {
+			return nil, err
+		}
+	}
+	return &r, err
+}
+func (s *Store) GetRoomById(id int) (*models.StoredRoom, error) {
+	DBroom, err := s.db.Query(GetRoomByIdQuery, id)
 	if err != nil {
 		log.Println(err)
 		return nil, err

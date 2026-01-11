@@ -6,7 +6,7 @@ import (
 )
 
 // adding user with given name(which is unique) to the room
-const AddUserToRoomQuery = `INSERT INTO room_members (room_id, username, room_name) VALUES ($1, $2, $3)`
+const AddUserToRoomQuery = `INSERT INTO room_members (room_id, username) VALUES ($1, $2)`
 
 // removing user with given name(which is unique) from the room
 const RemoveUserFromRoomQuery = `DELETE FROM room_members WHERE room_id = $1 AND username = $2`
@@ -15,18 +15,17 @@ const RemoveUserFromRoomQuery = `DELETE FROM room_members WHERE room_id = $1 AND
 const GetUsersInRoomQuery = `SELECT * FROM room_members WHERE room_id = $1`
 
 // fetching all rooms of a user
-const GetAllRoomsOfUserQuery = `SELECT room_id,room_name
+const GetAllRoomsOfUserQuery = `SELECT room_id
 		 FROM room_members
 		 WHERE username=$1
-		 ORDER BY username ASC`
+		 ORDER BY joined_at ASC`
 
 // add user to room if err==nil means user is added
-func (s *Store) AddUserToRoom(roomId int, username string, roomName string) error {
+func (s *Store) AddUserToRoom(roomId int, username string) error {
 	_, err := s.db.Exec(
 		AddUserToRoomQuery,
 		roomId,
 		username,
-		roomName,
 	)
 	return err
 }
@@ -77,7 +76,6 @@ func (s *Store) GetRoomsOfUser(username string) ([]*models.StoredRoom, error) {
 		var r models.StoredRoom
 		if err := rows.Scan(
 			&r.ID,
-			&r.Name,
 		); err != nil {
 			return nil, err
 		}

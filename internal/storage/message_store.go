@@ -16,10 +16,11 @@ type StorageInterface interface {
 	//room operations
 	CreateRoom(room string, name string) (*models.StoredRoom, error)
 	GetRoomByName(name string) (*models.StoredRoom, error)
+	GetRoomById(id int) (*models.StoredRoom, error)
 	GetAllRooms() ([]*models.StoredRoom, error)
 
 	//room-user operations
-	AddUserToRoom(roomId int, username string, roomName string) error
+	AddUserToRoom(roomId int, username string) error
 	RemoveUserFromRoom(roomId int, username string) error
 	GetUsersInRoom(roomId int) ([]*models.RoomMember, error)
 	GetRoomsOfUser(username string) ([]*models.StoredRoom, error)
