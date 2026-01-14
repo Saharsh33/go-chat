@@ -13,6 +13,9 @@ const GetRecentMessagesQuery = `SELECT id, room_id, username, content, created_a
 		 ORDER BY created_at DESC
 		 LIMIT $2`
 
+const SendDirectMessageQuery = `INSERT INTO directmessages (sender,receiver,content)
+								VALUES ($1,$2,$3)`
+
 func (s *Store) SaveMessage(msg string, roomId int, userName string) error {
 	_, err := s.db.Exec(
 		SaveMessageQuery,
@@ -49,4 +52,11 @@ func (s *Store) GetRecentMessages(roomId int, limit int) ([]models.Message, erro
 		msgs = append(msgs, m)
 	}
 	return msgs, nil
+}
+
+func (s *Store) SendDirectMessage(msg string, receiver string, user string) error {
+	_, err := s.db.Exec(
+		SendDirectMessageQuery, user, receiver, msg,
+	)
+	return err
 }

@@ -10,6 +10,9 @@ type StorageInterface interface {
 	SaveMessage(msg string, roomId int, userName string) error
 	GetRecentMessages(roomId int, limit int) ([]models.Message, error)
 
+	//dm
+	SendDirectMessage(msg string, reciever string, user string) error
+
 	//user operations
 	CreateUserIfNotExists(user string)
 
