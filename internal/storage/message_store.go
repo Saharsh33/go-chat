@@ -8,11 +8,11 @@ type StorageInterface interface {
 
 	//limit=20=>last 20 messages
 	SaveMessage(msg string, roomId int, userName string) error
-	GetRecentMessages(roomId int, limit int) ([]models.Message, error)
+	GetRecentMessages(roomId int, limit int, lastid int) ([]models.Message, error)
 
 	//dm
 	SendDirectMessage(msg string, reciever string, user string) error
-	GetRecentDirectMessages(username string, limit int) ([]models.Message, error)
+	GetRecentDirectMessages(username string, limit int, lastid int) ([]models.Message, error)
 
 	//user operations
 	CreateUserIfNotExists(user string)

@@ -4,13 +4,14 @@ type MessageType string
 
 const (
 	// client → server
-	MsgJoinRoom      MessageType = "join"
-	MsgLeaveRoom     MessageType = "leave"
-	MsgCreateRoom    MessageType = "create"
-	MsgRoomMessage   MessageType = "messageRoom"
-	MsgDirectMessage MessageType = "messageDirect"
-	MsgBroadcast     MessageType = "broadcast"
-
+	MsgJoinRoom           MessageType = "join"
+	MsgLeaveRoom          MessageType = "leave"
+	MsgCreateRoom         MessageType = "create"
+	MsgRoomMessage        MessageType = "messageRoom"
+	MsgDirectMessage      MessageType = "messageDirect"
+	MsgBroadcast          MessageType = "broadcast"
+	MsgNextRoomMessages   MessageType = "nextRoomMsgs"
+	MsgNextDirectMessages MessageType = "nextDirectMsgs"
 	// server → client
 	MsgSystem MessageType = "system"
 )

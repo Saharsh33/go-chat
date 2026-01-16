@@ -61,7 +61,7 @@ func (h *Hub) Run() {
 
 			//loading dms
 
-			messages, err := h.store.GetRecentDirectMessages(client.Username, LIMIT)
+			messages, err := h.store.GetRecentDirectMessages(client.Username, LIMIT, 0)
 
 			if err != nil {
 				log.Println("code : 105", err)
@@ -81,7 +81,7 @@ func (h *Hub) Run() {
 						h.UsersOfRoom[room.ID] = map[string]struct{}{}
 					}
 					h.UsersOfRoom[room.ID][client.Username] = struct{}{} //change the structure of the map
-					messages, err := h.store.GetRecentMessages(room.ID, LIMIT)
+					messages, err := h.store.GetRecentMessages(room.ID, LIMIT, 0)
 					if err != nil {
 						log.Println("code : 103", err)
 					} else {
@@ -111,7 +111,6 @@ func (h *Hub) Run() {
 			} else {
 				log.Println("Client doesn't exist in map")
 			}
-
 		case message := <-h.SendMessage:
 
 			switch message.Type {
@@ -212,8 +211,32 @@ func (h *Hub) Run() {
 					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
 					h.Clients[message.Receiver].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
 				}
+			case MsgNextRoomMessages:
+				lastid, _ := strconv.Atoi(message.Content)
+				msgs, err := h.store.GetRecentMessages(message.Room, LIMIT, lastid)
+				if err != nil {
+					log.Println("Error retrieving next msgs", err)
+				} else {
+					for _, messagesOfRoom := range msgs {
+						h.Clients[message.User].Send <- Message{Type: MsgRoomMessage, User: messagesOfRoom.User, Room: messagesOfRoom.Room, Content: messagesOfRoom.Content}
+					}
+
+				}
+
+			case MsgNextDirectMessages:
+				lastid, _ := strconv.Atoi(message.Content)
+				msgs, err := h.store.GetRecentDirectMessages(message.User, LIMIT, lastid)
+				if err != nil {
+					log.Println("Error retrieving next msgs", err)
+				} else {
+					for _, directMessageOfUser := range msgs {
+						h.Clients[message.User].Send <- Message{Type: MsgDirectMessage, User: directMessageOfUser.User, Receiver: directMessageOfUser.Receiver, Content: directMessageOfUser.Content}
+					}
+
+				}
 
 			}
+
 		case JoinRoomDetails := <-h.JoinRoom:
 
 			// Join a room

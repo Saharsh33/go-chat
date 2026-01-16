@@ -69,8 +69,14 @@ func (c *Client) readPump(h *Hub) {
 		//send to broadcast channel
 		case MsgBroadcast:
 			h.SendMessage <- msg
-		
+
 		case MsgDirectMessage:
+			h.SendMessage <- msg
+
+		case MsgNextDirectMessages:
+			h.SendMessage <- msg
+
+		case MsgNextRoomMessages:
 			h.SendMessage <- msg
 
 		default:
