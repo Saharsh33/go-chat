@@ -58,6 +58,19 @@ func (h *Hub) Run() {
 
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
+
+			//loading dms
+
+			messages, err := h.store.GetRecentDirectMessages(client.Username, LIMIT)
+
+			if err != nil {
+				log.Println("code : 105", err)
+			} else {
+				for _, directMessageOfUser := range messages {
+					client.Send <- Message{Type: MsgDirectMessage, User: directMessageOfUser.User, Receiver: directMessageOfUser.Receiver, Content: directMessageOfUser.Content}
+				}
+			}
+
 			h.RoomsOfUser[client.Username] = map[int]struct{}{}
 			DBroomsOfUser, err := h.store.GetRoomsOfUser(client.Username)
 			if err != nil {
@@ -101,19 +114,18 @@ func (h *Hub) Run() {
 
 		case message := <-h.SendMessage:
 
-			if message.Type != MsgDirectMessage {
-				err := h.store.SaveMessage(message.Content, message.Room, message.User)
-				if err != nil {
-					log.Println("Can't Save message!! ", err)
-					break
-				}
-			}
-
 			switch message.Type {
 
 			case MsgBroadcast:
 
 				// Send message to all clients
+
+				err := h.store.SaveMessage(message.Content, message.Room, message.User)
+				if err != nil {
+					log.Println("Can't Save message!! ", err)
+					break
+				}
+
 				message.Room = 0
 				for _, client := range h.Clients {
 					select {
@@ -138,6 +150,7 @@ func (h *Hub) Run() {
 			case MsgRoomMessage:
 				roomId := message.Room
 				// Send message to particular room
+
 				_, ok1 := h.UsersOfRoom[roomId]
 
 				if ok1 {
@@ -148,6 +161,11 @@ func (h *Hub) Run() {
 					if ok2 {
 
 						// If client exists in that room
+						err := h.store.SaveMessage(message.Content, message.Room, message.User)
+						if err != nil {
+							log.Println("Can't Save message!! ", err)
+							break
+						}
 						for user := range h.UsersOfRoom[roomId] {
 
 							//for all clients in the room
@@ -180,12 +198,19 @@ func (h *Hub) Run() {
 			case MsgDirectMessage:
 				// send direct msg
 
-				err := h.store.SendDirectMessage(message.Content, message.Receiver, message.User)
+				_, err := h.store.GetUserByName(message.Receiver)
+				if err != nil {
+					log.Println("User not found", err)
+					break
+				}
+
+				err = h.store.SendDirectMessage(message.Content, message.Receiver, message.User)
 
 				if err != nil {
 					log.Println("hub.go/Run/SendMessage/DirectMessage", err)
 				} else {
-					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Receiver: message.Receiver, Content: "DM sent!!"}
+					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
+					h.Clients[message.Receiver].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
 				}
 
 			}

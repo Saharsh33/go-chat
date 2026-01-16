@@ -16,6 +16,12 @@ const GetRecentMessagesQuery = `SELECT id, room_id, username, content, created_a
 const SendDirectMessageQuery = `INSERT INTO directmessages (sender,receiver,content)
 								VALUES ($1,$2,$3)`
 
+const GetRecentDirectMessagesQuery = `SELECT id,receiver,sender,content,created_at
+										FROM directmessages
+										WHERE sender=$1 OR receiver=$1
+										ORDER BY created_at DESC
+										LIMIT $2`
+
 func (s *Store) SaveMessage(msg string, roomId int, userName string) error {
 	_, err := s.db.Exec(
 		SaveMessageQuery,
@@ -59,4 +65,34 @@ func (s *Store) SendDirectMessage(msg string, receiver string, user string) erro
 		SendDirectMessageQuery, user, receiver, msg,
 	)
 	return err
+}
+
+func (s *Store) GetRecentDirectMessages(username string, limit int) ([]models.Message, error) {
+
+	rows, err := s.db.Query(
+		GetRecentDirectMessagesQuery,
+		username,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []models.Message
+	for rows.Next() {
+		var m models.Message
+		if err := rows.Scan(
+			&m.ID,
+			&m.Receiver,
+			&m.User,
+			&m.Content,
+			&m.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, nil
+
 }
