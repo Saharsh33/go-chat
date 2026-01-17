@@ -1,8 +1,8 @@
 package websocket
 
 import (
+	"context"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 
@@ -17,8 +17,9 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
+var temp int = 0
 
+func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 	// This function gets called when client send http req to server
 	// upgrading from http to websocket
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -26,13 +27,18 @@ func ServeWS(h *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+	ctx, cancel := context.WithCancel(r.Context())
 
 	//create client
 	client := &Client{
 		Conn:     conn,
-		Username: "user-" + strconv.Itoa(rand.Intn(100000)),
+		Username: "user-" + strconv.Itoa(temp%3),
 		Send:     make(chan Message),
+		Ctx:      ctx,
+		Cancel:   cancel,
 	}
+
+	temp++
 
 	//register client
 	h.Register <- client

@@ -5,6 +5,6 @@ type Room struct {
 }
 type RoomOps struct {
 	clientDetails *Client
-	roomDetails   string
+	roomDetails   int
+	roomName      string
 }
-

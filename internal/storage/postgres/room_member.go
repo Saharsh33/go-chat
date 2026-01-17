@@ -1,0 +1,91 @@
+package postgres
+
+import (
+	"chat-server/internal/models"
+	"context"
+	"log"
+)
+
+const ( 
+	// adding user with given name(which is unique) to the room
+	AddUserToRoomQuery = `INSERT INTO room_members (room_id, username) VALUES ($1, $2)`
+
+	// removing user with given name(which is unique) from the room
+	RemoveUserFromRoomQuery = `DELETE FROM room_members WHERE room_id = $1 AND username = $2`
+
+	// get all the users in the room with given id
+	GetUsersInRoomQuery = `SELECT * FROM room_members WHERE room_id = $1`
+
+	// fetching all rooms of a user
+	GetAllRoomsOfUserQuery = `SELECT room_id
+		 FROM room_members
+		 WHERE username=$1
+		 ORDER BY joined_at ASC`
+)
+
+// add user to room if err==nil means user is added
+func (s *Store) AddUserToRoom(ctx context.Context, roomId int, username string) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		AddUserToRoomQuery,
+		roomId,
+		username,
+	)
+	return err
+}
+
+// delete user to room if err==nil means user is added
+func (s *Store) RemoveUserFromRoom(ctx context.Context, roomId int, username string) error {
+	_, err := s.db.ExecContext(
+		ctx,
+		RemoveUserFromRoomQuery,
+		roomId,
+		username,
+	)
+	return err
+}
+
+func (s *Store) GetUsersInRoom(ctx context.Context, roomId int) ([]*models.RoomMember, error) {
+	rows, err := s.db.QueryContext(
+		ctx,
+		GetUsersInRoomQuery,
+		roomId,
+	)
+	if err != nil {
+		log.Println("Can't fetch users from room with id ", roomId)
+		return nil, err
+	}
+	defer rows.Close()
+	var members []*models.RoomMember
+	for rows.Next() {
+		var m models.RoomMember
+		if err := rows.Scan(
+			&m.RoomID,
+			&m.Username,
+			&m.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		members = append(members, &m)
+	}
+	return members, nil
+}
+
+func (s *Store) GetRoomsOfUser(ctx context.Context, username string) ([]*models.StoredRoom, error) {
+	rows, err := s.db.QueryContext(ctx, GetAllRoomsOfUserQuery, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rooms []*models.StoredRoom
+	for rows.Next() {
+		var r models.StoredRoom
+		if err := rows.Scan(
+			&r.ID,
+		); err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, &r)
+	}
+	return rooms, nil
+}
