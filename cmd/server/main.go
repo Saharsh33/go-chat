@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"chat-server/internal/config"
-	"chat-server/internal/storage/postgres"
+	postgres "chat-server/internal/storage/db"
 	"chat-server/internal/websocket"
 
 	_ "github.com/lib/pq"

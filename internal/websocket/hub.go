@@ -56,7 +56,7 @@ func (h *Hub) Run() {
 
 		case client := <-h.Register:
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    		defer cancel()
+			defer cancel()
 			h.store.CreateUserIfNotExists(ctx, client.Username) // Should be handled somewhere else
 
 			// Registering the client by mapping in h.Clients
@@ -82,7 +82,7 @@ func (h *Hub) Run() {
 				for _, room := range DBroomsOfUser {
 					if h.UsersOfRoom[room.ID] == nil {
 						h.UsersOfRoom[room.ID] = map[string]struct{}{}
-						log.Println(room.ID,"included in map")
+						log.Println(room.ID, "included in map")
 					}
 					h.UsersOfRoom[room.ID][client.Username] = struct{}{} //change the structure of the map
 					messages, err := h.store.GetRecentMessages(ctx, room.ID, LIMIT, 0)
@@ -116,7 +116,7 @@ func (h *Hub) Run() {
 				log.Println("Client doesn't exist in map")
 			}
 		case message := <-h.SendMessage:
-			
+
 			switch message.Type {
 
 			case MsgBroadcast:
@@ -150,12 +150,11 @@ func (h *Hub) Run() {
 				}
 				//h.Store.SaveMessage(models.Message{ID:,Type:,Room:,User:,Content:,CreatedAt:})
 				h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Message sent to broadcast"}
-				
 
 			case MsgRoomMessage:
 				roomId := message.Room
 				// Send message to particular room
-				
+
 				_, ok1 := h.UsersOfRoom[roomId]
 
 				if ok1 {
@@ -166,7 +165,7 @@ func (h *Hub) Run() {
 					if ok2 {
 
 						// If client exists in that room
-						
+
 						ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 						defer cancel()
 						err := h.store.SaveMessage(ctx, message.Content, message.Room, message.User)
@@ -194,7 +193,7 @@ func (h *Hub) Run() {
 							}
 						}
 						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "Message sent"}
-						
+
 					} else {
 						h.Clients[message.User].Send <- Message{Type: MsgSystem, User: "system", Room: -1, Content: "User not part of room"}
 						log.Println(message.User, " is not in the room:-", message.Room)
@@ -208,7 +207,7 @@ func (h *Hub) Run() {
 				// send direct msg
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				
+
 				_, err := h.store.GetUserByName(ctx, message.Receiver)
 				if err != nil {
 					log.Println("User not found", err)
@@ -261,7 +260,6 @@ func (h *Hub) Run() {
 			// Per-operation timeout context
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			
 
 			// Join a room
 			flag := false
@@ -312,7 +310,7 @@ func (h *Hub) Run() {
 			roomID := LeaveRoomDetails.roomDetails
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			
+
 			// Leave a room
 			_, ok := h.UsersOfRoom[roomID]
 
@@ -346,7 +344,7 @@ func (h *Hub) Run() {
 			roomName := CreateRoomDetails.roomName
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			
+
 			log.Println("Recieved for room creation!!")
 
 			if _, ok2 := h.store.GetRoomByName(ctx, roomName); ok2 != nil {
