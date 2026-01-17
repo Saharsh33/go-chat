@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,8 @@ type Client struct {
 	Conn     *websocket.Conn
 	Send     chan Message
 	Username string
+	Ctx      context.Context
+	Cancel   context.CancelFunc
 }
 
 // readpump can detect disconnection error
@@ -19,6 +22,7 @@ func (c *Client) readPump(h *Hub) {
 
 	//cleanup after disconnection
 	defer func() {
+		c.Cancel()
 		h.Unregister <- c
 		c.Conn.Close()
 	}()
@@ -62,23 +66,9 @@ func (c *Client) readPump(h *Hub) {
 			log.Printf("Sent for room creation!! %+v", roomOpsDetails)
 			h.CreateRoom <- roomOpsDetails
 
-		//message in a particular room
-		case MsgRoomMessage:
+		//message
+		case MsgRoomMessage,MsgBroadcast,MsgDirectMessage,MsgNextDirectMessages,MsgNextRoomMessages:
 			h.SendMessage <- msg
-
-		//send to broadcast channel
-		case MsgBroadcast:
-			h.SendMessage <- msg
-
-		case MsgDirectMessage:
-			h.SendMessage <- msg
-
-		case MsgNextDirectMessages:
-			h.SendMessage <- msg
-
-		case MsgNextRoomMessages:
-			h.SendMessage <- msg
-
 		default:
 			fmt.Println("invalid Request:")
 		}

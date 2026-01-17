@@ -13,13 +13,16 @@ import (
 )
 
 func main() {
+	//logging format
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	// 1. Load config
 	cfg := config.Load()
 
 	// 2. Connect to Postgres (ONLY here)
 	db := postgres.NewDB(cfg.PostgresDSN)
-	if(db==nil){
-		panic("DB connection failed!!");
+	if db == nil {
+		panic("DB connection failed!!")
 	}
 	log.Println("Connected to Postgres")
 

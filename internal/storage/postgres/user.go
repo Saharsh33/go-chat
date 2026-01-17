@@ -1,12 +1,17 @@
 package postgres
 
-import "log"
+import (
+	"context"
+	"log"
+)
 
-const CreateUserIfNotExistsQuery = `INSERT INTO users (username) VALUES ($1) ON CONFLICT (username) DO NOTHING;
-`
-const GetUserByNameQuery = `SELECT Id FROM users WHERE username = $1`
+const (
+	CreateUserIfNotExistsQuery = `INSERT INTO users (username) VALUES ($1) ON CONFLICT (username) DO NOTHING;`
+	
+	GetUserByNameQuery = `SELECT Id FROM users WHERE username = $1`
+)
 
-func (s *Store) CreateUserIfNotExists(user string) {
+func (s *Store) CreateUserIfNotExists(ctx context.Context, user string) {
 
 	_, err := s.db.Exec(CreateUserIfNotExistsQuery, user)
 
@@ -17,8 +22,8 @@ func (s *Store) CreateUserIfNotExists(user string) {
 
 }
 
-func (s *Store) GetUserByName(user string) (int, error) {
-	userId, err := s.db.Query(GetUserByNameQuery, user)
+func (s *Store) GetUserByName(ctx context.Context, user string) (int, error) {
+	userId, err := s.db.QueryContext(ctx, GetUserByNameQuery, user)
 	var id int
 	for userId.Next() {
 		if err := userId.Scan(

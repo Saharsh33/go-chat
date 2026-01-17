@@ -2,37 +2,40 @@ package postgres
 
 import (
 	"chat-server/internal/models"
+	"context"
 	"log"
 )
 
-// creating room
-const RoomCreateQuery = `INSERT INTO rooms (name, description, created_by)
+const (
+	// creating room
+	RoomCreateQuery = `INSERT INTO rooms (name, description, created_by)
 		 VALUES ($1, $2, $3) RETURNING id , name`
 
-// fetching all rooms
-const GetAllRoomsQuery = `SELECT *
+	// fetching all rooms
+	GetAllRoomsQuery = `SELECT *
 		 FROM roomMembers
 		 WHERE username = $1
 		 ORDER BY name ASC`
 
-// fetching room by name(unique)
-const GetRoomByNameQuery = `SELECT id,name
+	// fetching room by name(unique)
+	GetRoomByNameQuery = `SELECT id,name
 		 FROM rooms
 		 WHERE name = $1`
 
-const GetRoomByIdQuery = `SELECT id,name
+	GetRoomByIdQuery = `SELECT id,name
 		 FROM rooms
 		 WHERE id = $1`
+)
 
-func (s *Store) CreateRoom(room string, name string) (*models.StoredRoom, error) {
+func (s *Store) CreateRoom(ctx context.Context, room string, name string) (*models.StoredRoom, error) {
 	var result models.StoredRoom
 	roomdescription := ""
-	err := s.db.QueryRow(RoomCreateQuery, room, roomdescription, name).Scan(&result.ID, &result.Name)
+	err := s.db.QueryRowContext(ctx, RoomCreateQuery, room, roomdescription, name).Scan(&result.ID, &result.Name)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	err = s.AddUserToRoom(result.ID, name)
+	err = s.AddUserToRoom(ctx, result.ID, name)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -41,8 +44,8 @@ func (s *Store) CreateRoom(room string, name string) (*models.StoredRoom, error)
 
 }
 
-func (s *Store) GetRoomByName(room string) (*models.StoredRoom, error) {
-	DBroom, err := s.db.Query(GetRoomByNameQuery, room)
+func (s *Store) GetRoomByName(ctx context.Context, room string) (*models.StoredRoom, error) {
+	DBroom, err := s.db.QueryContext(ctx, GetRoomByNameQuery, room)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -58,8 +61,8 @@ func (s *Store) GetRoomByName(room string) (*models.StoredRoom, error) {
 	}
 	return &r, err
 }
-func (s *Store) GetRoomById(id int) (*models.StoredRoom, error) {
-	DBroom, err := s.db.Query(GetRoomByIdQuery, id)
+func (s *Store) GetRoomById(ctx context.Context, id int) (*models.StoredRoom, error) {
+	DBroom, err := s.db.QueryContext(ctx, GetRoomByIdQuery, id)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -75,8 +78,8 @@ func (s *Store) GetRoomById(id int) (*models.StoredRoom, error) {
 	}
 	return &r, err
 }
-func (s *Store) GetAllRooms() ([]*models.StoredRoom, error) {
-	rows, err := s.db.Query(GetAllRoomsQuery)
+func (s *Store) GetAllRooms(ctx context.Context) ([]*models.StoredRoom, error) {
+	rows, err := s.db.QueryContext(ctx, GetAllRoomsQuery)
 	if err != nil {
 		return nil, err
 	}
