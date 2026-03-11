@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	PostgresDSN string
+	JWTSecret   string
 }
 
 func Load() Config {
@@ -17,8 +18,14 @@ func Load() Config {
 		log.Println("No .env file found, using environment variables")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is required but not set")
+	}
+
 	return Config{
 		PostgresDSN: os.Getenv("POSTGRES_DSN"),
+		JWTSecret:   jwtSecret,
 	}
 }
 

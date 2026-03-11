@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"chat-server/internal/config"
+	chathttp "chat-server/internal/http"
 	postgres "chat-server/internal/storage/db"
 	"chat-server/internal/websocket"
 
@@ -33,18 +34,22 @@ func main() {
 	hub := websocket.NewHub(store)
 	go hub.Run()
 
-	// 5. WebSocket endpoint
+	// 5. Auth endpoints
+	http.HandleFunc("/register", chathttp.NewRegisterHandler(store, cfg.JWTSecret))
+	http.HandleFunc("/login", chathttp.NewLoginHandler(store, cfg.JWTSecret))
+
+	// 6. WebSocket endpoint
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		websocket.ServeWS(hub, w, r)
+		websocket.ServeWS(hub, w, r, cfg.JWTSecret)
 	})
 
-	// 6. Health check (optional but good)
+	// 7. Health check (optional but good)
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	// 7. Start HTTP server
+	// 8. Start HTTP server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -53,3 +58,4 @@ func main() {
 	log.Println("Server started on :" + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
+

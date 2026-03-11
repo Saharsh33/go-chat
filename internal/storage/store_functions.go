@@ -20,6 +20,8 @@ type StorageInterface interface {
 	//user operations
 	CreateUserIfNotExists(ctx context.Context, user string)
 	GetUserByName(ctx context.Context, user string) (int, error)
+	RegisterUser(ctx context.Context, username, passwordHash string) error
+	GetUserPasswordHash(ctx context.Context, username string) (string, error)
 
 	//room operations
 	CreateRoom(ctx context.Context, room string, name string) (*models.StoredRoom, error)
