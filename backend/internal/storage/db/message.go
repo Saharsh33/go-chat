@@ -21,20 +21,21 @@ const (
 		 ORDER BY created_at DESC
 		 LIMIT $2`
 
-	SendDirectMessageQuery = `INSERT INTO directmessages (sender,receiver,content)
-								VALUES ($1,$2,$3)`
+	// DM queries now use conversation_id
+	SendDirectMessageQuery = `INSERT INTO directmessages (conversation_id, sender, receiver, content)
+		VALUES ($1, $2, $3, $4)`
 
-	GetRecentDirectMessagesQuery = `SELECT id,receiver,sender,content,created_at
-										FROM directmessages
-										WHERE sender=$1 OR receiver=$1
-										ORDER BY created_at DESC
-										LIMIT $2`
+	GetRecentDirectMessagesQuery = `SELECT id, conversation_id, receiver, sender, content, created_at
+		FROM directmessages
+		WHERE conversation_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2`
 
-	GetRangedDirectMessagesQuery = `SELECT id,receiver,sender,content,created_at
-										FROM directmessages
-										WHERE (sender=$1 OR receiver=$1) AND id < $3
-										ORDER BY created_at DESC
-										LIMIT $2`
+	GetRangedDirectMessagesQuery = `SELECT id, conversation_id, receiver, sender, content, created_at
+		FROM directmessages
+		WHERE conversation_id = $1 AND id < $3
+		ORDER BY created_at DESC
+		LIMIT $2`
 )
 
 func (s *Store) SaveMessage(ctx context.Context, msg string, roomId int, userName string) error {
@@ -90,32 +91,33 @@ func (s *Store) GetRecentMessages(ctx context.Context, roomId int, limit int, la
 	return msgs, nil
 }
 
-func (s *Store) SendDirectMessage(ctx context.Context, msg string, receiver string, user string) error {
+func (s *Store) SendDirectMessage(ctx context.Context, msg string, conversationID int, sender string, receiver string) error {
 	_, err := s.db.ExecContext(
 		ctx,
 		SendDirectMessageQuery,
-		user,
+		conversationID,
+		sender,
 		receiver,
 		msg,
 	)
 	return err
 }
 
-func (s *Store) GetRecentDirectMessages(ctx context.Context, username string, limit int, lastid int) ([]models.Message, error) {
-
+func (s *Store) GetRecentDirectMessages(ctx context.Context, conversationID int, limit int, lastid int) ([]models.Message, error) {
 	var rows *sql.Rows
 	var err error
 	if lastid == 0 {
 		rows, err = s.db.QueryContext(
 			ctx,
 			GetRecentDirectMessagesQuery,
-			username,
+			conversationID,
 			limit,
 		)
 	} else {
-		rows, err = s.db.Query(
+		rows, err = s.db.QueryContext(
+			ctx,
 			GetRangedDirectMessagesQuery,
-			username,
+			conversationID,
 			limit,
 			lastid,
 		)
@@ -130,6 +132,7 @@ func (s *Store) GetRecentDirectMessages(ctx context.Context, username string, li
 		var m models.Message
 		if err := rows.Scan(
 			&m.ID,
+			&m.ConversationID,
 			&m.Receiver,
 			&m.User,
 			&m.Content,
@@ -140,5 +143,4 @@ func (s *Store) GetRecentDirectMessages(ctx context.Context, username string, li
 		msgs = append(msgs, m)
 	}
 	return msgs, nil
-
 }

@@ -67,7 +67,7 @@ func (c *Client) readPump(h *Hub) {
 			h.CreateRoom <- roomOpsDetails
 
 		//message
-		case MsgRoomMessage,MsgBroadcast,MsgDirectMessage,MsgNextDirectMessages,MsgNextRoomMessages:
+		case MsgRoomMessage,MsgBroadcast,MsgDirectMessage,MsgNextDirectMessages,MsgNextRoomMessages,MsgGetConversations:
 			h.SendMessage <- msg
 		default:
 			fmt.Println("invalid Request:")

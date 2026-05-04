@@ -13,9 +13,11 @@ type StorageInterface interface {
 	SaveMessage(ctx context.Context, msg string, roomId int, userName string) error
 	GetRecentMessages(ctx context.Context, roomId int, limit int, lastid int) ([]models.Message, error)
 
-	//dm
-	SendDirectMessage(ctx context.Context, msg string, reciever string, user string) error
-	GetRecentDirectMessages(ctx context.Context, username string, limit int, lastid int) ([]models.Message, error)
+	//dm (conversation-scoped)
+	GetOrCreateConversation(ctx context.Context, userA string, userB string) (*models.Conversation, error)
+	SendDirectMessage(ctx context.Context, msg string, conversationID int, sender string, receiver string) error
+	GetRecentDirectMessages(ctx context.Context, conversationID int, limit int, lastid int) ([]models.Message, error)
+	GetConversationsOfUser(ctx context.Context, username string) ([]models.Conversation, error)
 
 	//user operations
 	CreateUserIfNotExists(ctx context.Context, user string)

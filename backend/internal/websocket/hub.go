@@ -3,6 +3,7 @@ package websocket
 import (
 	"chat-server/internal/storage"
 	"context"
+	"encoding/json"
 	"log"
 	"strconv"
 	"time"
@@ -62,15 +63,26 @@ func (h *Hub) Run() {
 			// Registering the client by mapping in h.Clients
 			h.Clients[client.Username] = client
 
-			//loading dms
-
-			messages, err := h.store.GetRecentDirectMessages(ctx, client.Username, LIMIT, 0)
-
+			//loading conversations and their recent DMs
+			convos, err := h.store.GetConversationsOfUser(ctx, client.Username)
 			if err != nil {
-				log.Println("code : 105", err)
+				log.Println("code : 105 - can't load conversations:", err)
 			} else {
-				for _, directMessageOfUser := range messages {
-					client.Send <- Message{Type: MsgDirectMessage, User: directMessageOfUser.User, Receiver: directMessageOfUser.Receiver, Content: directMessageOfUser.Content}
+				for _, convo := range convos {
+					msgs, err := h.store.GetRecentDirectMessages(ctx, convo.ID, LIMIT, 0)
+					if err != nil {
+						log.Println("code : 106 - can't load DMs for conversation:", convo.ID, err)
+						continue
+					}
+					for _, dm := range msgs {
+						client.Send <- Message{
+							Type:           MsgDirectMessage,
+							User:           dm.User,
+							Receiver:       dm.Receiver,
+							Content:        dm.Content,
+							ConversationID: dm.ConversationID,
+						}
+					}
 				}
 			}
 
@@ -204,7 +216,7 @@ func (h *Hub) Run() {
 				}
 
 			case MsgDirectMessage:
-				// send direct msg
+				// send direct msg — get or create a conversation first
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 
@@ -213,14 +225,31 @@ func (h *Hub) Run() {
 					log.Println("User not found", err)
 					break
 				}
-				err = h.store.SendDirectMessage(ctx, message.Content, message.Receiver, message.User)
+
+				convo, err := h.store.GetOrCreateConversation(ctx, message.User, message.Receiver)
+				if err != nil {
+					log.Println("hub.go/Run/SendMessage/DirectMessage - conversation error:", err)
+					break
+				}
+
+				err = h.store.SendDirectMessage(ctx, message.Content, convo.ID, message.User, message.Receiver)
 
 				if err != nil {
 					log.Println("hub.go/Run/SendMessage/DirectMessage", err)
 				} else {
-					h.Clients[message.User].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
-					h.Clients[message.Receiver].Send <- Message{Type: MsgSystem, User: message.User, Receiver: message.Receiver, Content: message.Content}
+					outMsg := Message{
+						Type:           MsgDirectMessage,
+						User:           message.User,
+						Receiver:       message.Receiver,
+						Content:        message.Content,
+						ConversationID: convo.ID,
+					}
+					h.Clients[message.User].Send <- outMsg
+					if recvClient, ok := h.Clients[message.Receiver]; ok {
+						recvClient.Send <- outMsg
+					}
 				}
+
 			case MsgNextRoomMessages:
 
 				lastid, _ := strconv.Atoi(message.Content)
@@ -237,19 +266,42 @@ func (h *Hub) Run() {
 				}
 
 			case MsgNextDirectMessages:
+				// Now paginate within a specific conversation
 				lastid, _ := strconv.Atoi(message.Content)
+				conversationID := message.ConversationID
+
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
-				msgs, err := h.store.GetRecentDirectMessages(ctx, message.User, LIMIT, lastid)
+				msgs, err := h.store.GetRecentDirectMessages(ctx, conversationID, LIMIT, lastid)
 				if err != nil {
-					log.Println("Error retrieving next msgs", err)
+					log.Println("Error retrieving next DMs", err)
 				} else {
-					for _, directMessageOfUser := range msgs {
-						h.Clients[message.User].Send <- Message{Type: MsgDirectMessage, User: directMessageOfUser.User, Receiver: directMessageOfUser.Receiver, Content: directMessageOfUser.Content}
+					for _, dm := range msgs {
+						h.Clients[message.User].Send <- Message{
+							Type:           MsgDirectMessage,
+							User:           dm.User,
+							Receiver:       dm.Receiver,
+							Content:        dm.Content,
+							ConversationID: dm.ConversationID,
+						}
 					}
-
 				}
 
+			case MsgGetConversations:
+				// Return all conversations for the requesting user
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				convos, err := h.store.GetConversationsOfUser(ctx, message.User)
+				if err != nil {
+					log.Println("Error fetching conversations", err)
+				} else {
+					data, _ := json.Marshal(convos)
+					h.Clients[message.User].Send <- Message{
+						Type:    MsgConversationsList,
+						User:    "system",
+						Content: string(data),
+					}
+				}
 			}
 
 		case JoinRoomDetails := <-h.JoinRoom:
